@@ -4,3 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+regex = "1.10.5"
+rand = "0.8.5"
+timeit = "0.1.2"
+kolmogorov_smirnov = "1.1.0"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
