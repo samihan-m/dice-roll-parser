@@ -47,6 +47,13 @@ pub fn parse_roll_with_regex(input: &str) -> i32 {
     total
 }
 
+/// Errors that may arise during the parsing of a dice roll string
+#[derive(Debug)]
+pub enum Error {
+    ParseError(String), // Unexpected character or something
+    DieSideCountError(String), // Syntactically valid but semantically invalid die side count (e.g. a 0-sided die)
+}
+
 #[derive(Debug)]
 enum State {
     NewTerm,
@@ -61,7 +68,7 @@ enum Operation {
 }
 
 /// Parse the dice roll string with something like a state machine I modelled off of a DFA I drew
-pub fn parse_roll_with_state_machine(input: &str) -> i32 {
+pub fn parse_roll_with_state_machine(input: &str) -> Result<i32, Error> {
     let mut rng = rand::thread_rng();
 
     let mut state = State::NewTerm;
@@ -89,7 +96,12 @@ pub fn parse_roll_with_state_machine(input: &str) -> i32 {
                 '+' => operation = Operation::Add,
                 '-' => operation = Operation::Subtract,
                 ' ' => {}
-                _ => panic!("Unexpected character when looking for a new term: {}", char),
+                _ => {
+                    return Err(Error::ParseError(format!(
+                        "Unexpected character when looking for a new term: {}",
+                        char
+                    )))
+                }
             },
             State::ParsingNumber(ref mut buffer) => match char {
                 '0'..='9' => {
@@ -105,7 +117,10 @@ pub fn parse_roll_with_state_machine(input: &str) -> i32 {
                             );
                         }
                         Err(_) => {
-                            panic!("Failed to parse multiplier: {}", buffer);
+                            return Err(Error::ParseError(format!(
+                                "Failed to parse multiplier: {}",
+                                buffer
+                            )));
                         }
                     }
                 }
@@ -125,16 +140,27 @@ pub fn parse_roll_with_state_machine(input: &str) -> i32 {
                                 '-' => operation = Operation::Subtract,
                                 ' ' => {}
                                 _ => {
-                                    panic!("Unexpected character when parsing number: {}", char)
+                                    return Err(Error::ParseError(format!(
+                                        "Unexpected character when parsing number: {}",
+                                        char
+                                    )));
                                 }
                             }
                         }
                         Err(_) => {
-                            panic!("Failed to parse number: {}", buffer);
+                            return Err(Error::ParseError(format!(
+                                "Failed to parse number: {}",
+                                buffer
+                            )));
                         }
                     }
                 }
-                _ => panic!("Unexpected character when parsing number: {}", char),
+                _ => {
+                    return Err(Error::ParseError(format!(
+                        "Unexpected character when parsing number: {}",
+                        char
+                    )))
+                }
             },
             State::ParsingDieSideCount(die_roll_count, ref mut buffer) => match char {
                 '0'..='9' => {
@@ -145,10 +171,10 @@ pub fn parse_roll_with_state_machine(input: &str) -> i32 {
                     match die_side_count {
                         Ok(die_side_count) => {
                             if die_side_count < 1 {
-                                panic!(
+                                return Err(Error::DieSideCountError(format!(
                                     "Die side-count should be at least 1. Instead, it was {}",
                                     die_side_count
-                                );
+                                )));
                             }
 
                             let value_to_add = (0..die_roll_count)
@@ -166,24 +192,37 @@ pub fn parse_roll_with_state_machine(input: &str) -> i32 {
                                 '+' => operation = Operation::Add,
                                 '-' => operation = Operation::Subtract,
                                 ' ' => {}
-                                _ => panic!("Unexpected character when parsing die type: {}", char),
+                                _ => {
+                                    return Err(Error::ParseError(format!(
+                                        "Unexpected character when parsing die type: {}",
+                                        char
+                                    )))
+                                }
                             }
                         }
                         Err(_) => {
-                            panic!("Failed to parse die type: {}", buffer);
+                            return Err(Error::ParseError(format!(
+                                "Failed to parse die type: {}",
+                                buffer
+                            )));
                         }
                     }
                 }
-                _ => panic!("Unexpected character when parsing die type: {}", char),
+                _ => {
+                    return Err(Error::ParseError(format!(
+                        "Unexpected character when parsing die type: {}",
+                        char
+                    )))
+                }
             },
         }
     }
 
-    total 
+    Ok(total)
 }
 
 /// Parse the dice roll string by splitting the expression into individual semantic pieces and processing them
-pub fn parse_roll_with_string_splits(input: &str) -> i32 {
+pub fn parse_roll_with_string_splits(input: &str) -> Result<i32, Error> {
     let input = input.replacen(' ', "", input.len());
     let input_split_by_operations = input.split_inclusive(['+', '-']).collect::<Vec<&str>>();
     // println!("{:?}", x);
@@ -228,10 +267,10 @@ pub fn parse_roll_with_string_splits(input: &str) -> i32 {
             operation = match last_character {
                 Some('+') => Operation::Add,
                 Some('-') => Operation::Subtract,
-                _ => panic!("Expected operation character at the end of term: {}", term),
+                _ => return Err(Error::ParseError(format!("Expected operation character at the end of term: {}", term))),
             };
         }
     }
-    
-    total
+
+    Ok(total)
 }
